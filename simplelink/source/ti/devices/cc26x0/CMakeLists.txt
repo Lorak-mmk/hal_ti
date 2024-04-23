@@ -4,9 +4,10 @@ zephyr_include_directories(
   .
   )
 
-# zephyr_library()
+zephyr_library()
 
-# zephyr_library_sources(
+zephyr_library_sources(
+  driverlib/aon_rtc.c
   # Required for SystemTrimDevice which is not in ROM
   # driverlib/setup.c
   # driverlib/chipinfo.c
@@ -19,7 +20,7 @@ zephyr_include_directories(
   # driverlib/driverlib_release.c
   # Required for newer HAL TI >= 4.40 (for PRCMPowerDomainsAllOn)
   # driverlib/prcm.c
-#  )
+)
 
 # Required for IEEE 802.15.4 support
 # zephyr_library_sources_ifdef(CONFIG_IEEE802154_CC13XX_CC26XX
