@@ -998,6 +998,10 @@ extern void PRCMPeripheralDeepSleepDisable(uint32_t ui32Peripheral);
 //*****************************************************************************
 extern uint32_t PRCMPowerDomainStatus(uint32_t ui32Domains);
 
+__STATIC_INLINE uint32_t PRCMPowerDomainsAllOn(uint32_t ui32Domains) {
+    return PRCMPowerDomainStatus(ui32Domains);
+}
+
 //*****************************************************************************
 //
 //! \brief Return the access status of the RF Core.
