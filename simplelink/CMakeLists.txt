@@ -102,6 +102,8 @@ elseif(CONFIG_HAS_CC26X0_SDK)
   zephyr_library()
   zephyr_library_compile_definitions(${COMPILER})
   zephyr_library_sources(
+    source/ti/drivers/power/PowerCC26XX.c
+    source/ti/drivers/power/PowerCC26XX_calibrateRCOSC.c
     source/ti/drivers/utils/List.c
     # kernel/zephyr/dpl/config.c
     kernel/zephyr/dpl/ClockP_zephyr.c
