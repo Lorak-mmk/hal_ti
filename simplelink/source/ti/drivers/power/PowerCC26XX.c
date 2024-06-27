@@ -69,6 +69,8 @@
 #include DeviceFamily_constructPath(driverlib/setup.h)
 #include DeviceFamily_constructPath(driverlib/ccfgread.h)
 
+#include <zephyr/pm/policy.h>
+
 static unsigned int configureXOSCHF(unsigned int action);
 static unsigned int nopResourceHandler(unsigned int action);
 static unsigned int configureRFCoreClocks(unsigned int action);
@@ -326,7 +328,7 @@ int_fast16_t Power_init()
 
         /* start the Clock object */
         ClockP_setTimeout(ClockP_handle(&PowerCC26XX_module.lfClockObj),
-            (timeout / ClockP_tickPeriod));
+            ClockP_convertUsToSystemTicksCeil(timeout));
         ClockP_start(ClockP_handle(&PowerCC26XX_module.lfClockObj));
     }
 
@@ -356,10 +358,10 @@ int_fast16_t Power_init()
         else
         {
             /* XOSC_HF is not ready yet, schedule clock to check again later */
-            timeout = PowerCC26XX_INITIALWAITXOSC_HF / ClockP_tickPeriod;
+            timeout = ClockP_convertUsToSystemTicksCeil(PowerCC26XX_INITIALWAITXOSC_HF);
             /* start the Clock object */
             ClockP_setTimeout(ClockP_handle(&PowerCC26XX_module.lfClockObj),
-                (timeout / ClockP_tickPeriod));
+                ClockP_convertUsToSystemTicksCeil(timeout));
             ClockP_start(ClockP_handle(&PowerCC26XX_module.lfClockObj));
         }
     }
@@ -410,6 +412,18 @@ int_fast16_t Power_releaseConstraint(uint_fast16_t constraintId)
     uint8_t count;
 
     DebugP_assert(constraintId < PowerCC26XX_NUMCONSTRAINTS);
+
+    /* forward constraint release to Zephyr */
+    switch (constraintId) {
+    case PowerCC26XX_DISALLOW_STANDBY:
+        pm_policy_state_lock_put(PM_STATE_STANDBY, PM_ALL_SUBSTATES);
+        break;
+    case PowerCC26XX_DISALLOW_IDLE:
+        pm_policy_state_lock_put(PM_STATE_RUNTIME_IDLE, PM_ALL_SUBSTATES);
+        break;
+    default:
+        break;
+    }
 
     key = HwiP_disable();
 
@@ -514,6 +528,18 @@ int_fast16_t Power_setConstraint(uint_fast16_t constraintId)
     unsigned int key;
 
     DebugP_assert(constraintId < PowerCC26XX_NUMCONSTRAINTS);
+
+    /* forward constraint set to Zephyr */
+    switch (constraintId) {
+    case PowerCC26XX_DISALLOW_STANDBY:
+        pm_policy_state_lock_get(PM_STATE_STANDBY, PM_ALL_SUBSTATES);
+        break;
+    case PowerCC26XX_DISALLOW_IDLE:
+        pm_policy_state_lock_get(PM_STATE_RUNTIME_IDLE, PM_ALL_SUBSTATES);
+        break;
+    default:
+        break;
+    }
 
     /* disable interrupts */
     key = HwiP_disable();
@@ -953,7 +979,11 @@ int_fast16_t Power_sleep(uint_fast16_t sleepState)
             }
 
             /* 27. Re-enable interrupts */
-            CPUcpsie();
+            /* For Zephyr, post suspend hooks need to run with interrupts
+             * disabled after Power_sleep returns. So we need to leave
+             * interrupts disabled.
+             */ 
+            /* CPUcpsie(); */
 
             /*
              * 28. Signal all clients registered for late post-sleep
@@ -1218,7 +1248,7 @@ static void lfClockReadyCallback(uintptr_t arg)
         }
         /* retrigger LF Clock to fire again */
         ClockP_setTimeout(ClockP_handle(&PowerCC26XX_module.lfClockObj),
-            (timeout / ClockP_tickPeriod));
+            ClockP_convertUsToSystemTicksCeil(timeout));
         ClockP_start(ClockP_handle(&PowerCC26XX_module.lfClockObj));
     }
 }
@@ -1339,7 +1369,7 @@ static void switchXOSCHFclockFunc(uintptr_t arg0)
     /* else, wait some more, then see if can switch ... */
     else {
         /* calculate wait timeout in units of ticks */
-        timeout = PowerCC26XX_RETRYWAITXOSC_HF / ClockP_tickPeriod;
+        timeout = ClockP_convertUsToSystemTicksCeil(PowerCC26XX_RETRYWAITXOSC_HF);
         if (timeout == 0) {
             timeout = 1;   /* wait at least 1 tick */
         }
@@ -1373,7 +1403,7 @@ static unsigned int configureXOSCHF(unsigned int action)
          */
         if (!(Power_getConstraintMask() & (1 << PowerCC26XX_SWITCH_XOSC_HF_MANUALLY))) {
              /* calculate wait timeout in units of ticks */
-            timeout = PowerCC26XX_INITIALWAITXOSC_HF / ClockP_tickPeriod;
+            timeout = ClockP_convertUsToSystemTicksCeil(PowerCC26XX_INITIALWAITXOSC_HF);
             if (timeout == 0) {
                 timeout = 1;   /* wait at least 1 tick */
             }
