@@ -105,6 +105,7 @@ elseif(CONFIG_HAS_CC26X0_SDK)
     source/ti/drivers/power/PowerCC26XX.c
     source/ti/drivers/power/PowerCC26XX_calibrateRCOSC.c
     source/ti/drivers/utils/List.c
+    source/ti/drivers/rf/RFCC26XX_multiMode.c
     # kernel/zephyr/dpl/config.c
     kernel/zephyr/dpl/ClockP_zephyr.c
     # kernel/zephyr/dpl/HwiP_zephyr.c

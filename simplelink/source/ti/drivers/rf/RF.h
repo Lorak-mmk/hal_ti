@@ -50,6 +50,8 @@ is linked in and include this header file as follows:
 
 #if (DeviceFamily_PARENT == DeviceFamily_PARENT_CC13X2_CC26X2)
     #include <ti/drivers/rf/RFCC26X2.h>
+#elif (DeviceFamily_PARENT == DeviceFamily_PARENT_CC13X0_CC26X0)
+    #include <ti/drivers/rf/RFCC26XX.h>
 #else
 #error "An incompatible device is defined in the project. \
         To build with this driver, change the DeviceFamily token definition."
