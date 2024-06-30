@@ -657,8 +657,8 @@ assert (rssi != RF_GET_RSSI_ERROR_VAL); // Could not read the RSSI
  ******************************************************************************
  */
 
-#ifndef ti_drivers_rf__include
-#define ti_drivers_rf__include
+#ifndef ti_drivers_rfcc26xx__include
+#define ti_drivers_rfcc26xx__include
 
 #ifdef __cplusplus
 extern "C" {
@@ -2455,4 +2455,4 @@ extern RF_TxPowerTable_Value RF_TxPowerTable_findValue(RF_TxPowerTable_Entry tab
 }
 #endif
 
-#endif /* ti_drivers_rf__include */
+#endif /* ti_drivers_rfcc26xx__include */

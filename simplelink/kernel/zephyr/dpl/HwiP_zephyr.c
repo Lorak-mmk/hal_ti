@@ -125,7 +125,7 @@ void HwiP_delete(HwiP_Handle handle)
 
 	irq_disable(interruptNum - 16);
 }
-#elif defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7)
+#elif defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7) || defined(CONFIG_SOC_SERIES_CC2650)
 /* INT_PENDSV is already taken by Zephyr, so let's use INT_SWEV0 to support
  * SwiP since this line is usually unused. Change this to a different
  * interrupt if desired.
@@ -137,7 +137,9 @@ typedef struct _HwiP_Obj {
     struct sl_isr_args * cb;
 } HwiP_Obj;
 
+#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7)
 static struct sl_isr_args sl_OSC_COMB_cb = {NULL, 0};
+#endif
 static struct sl_isr_args sl_AUX_COMB_cb = {NULL, 0};
 static struct sl_isr_args sl_RFC_HW_COMB_cb = {NULL, 0};
 static struct sl_isr_args sl_RFC_CPE_0_cb = {NULL, 0};
@@ -165,7 +167,12 @@ HwiP_Handle HwiP_construct(HwiP_Struct *handle, int interruptNum,
 	/*
 	 * Currently only support INT_OSC_COMB, INT_AUX_COMB, INT_SWEV0
 	 */
-	__ASSERT(INT_OSC_COMB == interruptNum || INT_AUX_COMB == interruptNum
+	__ASSERT(
+		#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7)
+		INT_OSC_COMB == interruptNum || INT_AUX_COMB == interruptNum
+		#else
+		INT_AUX_COMB == interruptNum
+		#endif
 		|| INT_RFC_HW_COMB == interruptNum
 		|| INT_RFC_CPE_0 == interruptNum
 		|| INT_SWEV0 == interruptNum,
@@ -212,12 +219,14 @@ HwiP_Handle HwiP_construct(HwiP_Struct *handle, int interruptNum,
 		obj->cb = &sl_RFC_HW_COMB_cb;
 		irq_connect_dynamic(INT_RFC_HW_COMB - 16, priority, sl_isr, &sl_RFC_HW_COMB_cb, 0);
 		break;
+	#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7)
 	case INT_OSC_COMB:
 		sl_OSC_COMB_cb.cb = hwiFxn;
 		sl_OSC_COMB_cb.arg = arg;
 		obj->cb = &sl_OSC_COMB_cb;
 		irq_connect_dynamic(INT_OSC_COMB - 16, priority, sl_isr, &sl_OSC_COMB_cb, 0);
 		break;
+	#endif
 	case INT_AUX_COMB:
 		sl_AUX_COMB_cb.cb = hwiFxn;
 		sl_AUX_COMB_cb.arg = arg;
@@ -250,7 +259,7 @@ void HwiP_Params_init(HwiP_Params *params)
 /* Zephyr has no functions for clearing an interrupt, so use driverlib: */
 void HwiP_clearInterrupt(int interruptNum)
 {
-#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7)
+#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7) || defined(CONFIG_SOC_SERIES_CC2650)
         IntPendClear((unsigned long)interruptNum);
 #elif defined(CONFIG_SOC_SERIES_CC32XX)
 	MAP_IntPendClear((unsigned long)interruptNum);
@@ -281,7 +290,7 @@ void HwiP_restore(uintptr_t key)
 	irq_unlock(key);
 }
 
-#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7)
+#if defined(CONFIG_SOC_SERIES_CC13X2_CC26X2) || defined(CONFIG_SOC_SERIES_CC13X2X7_CC26X2X7) || defined(CONFIG_SOC_SERIES_CC2650)
 void HwiP_post(int interruptNum)
 {
 	IntPendSet((uint32_t)interruptNum);
