@@ -209,6 +209,19 @@ RFCClockClear(uint32_t ui32Mask)
 
 //*****************************************************************************
 //
+//! Enable CPEx interrupt sources.
+//
+//*****************************************************************************
+__STATIC_INLINE void
+RFCCpeIntEnable(uint32_t ui32Mask)
+{
+    // Enable CPE interrupts from RF Core.
+    HWREG(RFC_DBELL_BASE + RFC_DBELL_O_RFCPEIEN) |= ui32Mask;
+}
+
+
+//*****************************************************************************
+//
 //! Enable CPE0 interrupt
 //
 //*****************************************************************************
@@ -299,7 +312,7 @@ RFCHwIntDisable(uint32_t ui32Mask)
 //! Get and clear CPE interrupt flags
 //
 //*****************************************************************************
-extern uint32_t RFCCpeIntGetAndClear(void);
+extern uint32_t RFCCpeIntGetAndClear(uint32_t ui32Mask);
 
 
 //*****************************************************************************
@@ -437,7 +450,9 @@ extern uint8_t RFCOverrideUpdate(rfc_radioOp_t *pOpSetup, uint32_t *pParams);
 //*****************************************************************************
 extern uint32_t RFCHWIntGetAndClear(uint32_t ui32Mask);
 
-
+__STATIC_INLINE uint32_t RFCHwIntGetAndClear(uint32_t ui32Mask) {
+    return RFCHWIntGetAndClear(ui32Mask);
+}
 
 //*****************************************************************************
 //

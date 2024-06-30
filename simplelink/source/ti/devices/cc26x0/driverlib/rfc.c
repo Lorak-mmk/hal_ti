@@ -104,18 +104,19 @@ static const uint16_t rfc_defaultIrqAddr[] =
 
 //*****************************************************************************
 //
-// Get and clear CPE interrupt flags
+// Get and clear CPE interrupt flags which match the provided bitmask
 //
 //*****************************************************************************
 uint32_t
-RFCCpeIntGetAndClear(void)
+RFCCpeIntGetAndClear(uint32_t ui32Mask)
 {
-    uint32_t ui32Ifg = HWREG(RFC_DBELL_BASE+RFC_DBELL_O_RFCPEIFG);
+    // Read the CPE interrupt flags which match the provided bitmask
+    uint32_t ui32Ifg = HWREG(RFC_DBELL_BASE+RFC_DBELL_O_RFCPEIFG) & ui32Mask;
 
-    do {
-        HWREG(RFC_DBELL_BASE+RFC_DBELL_O_RFCPEIFG) = ~ui32Ifg;
-    } while (HWREG(RFC_DBELL_BASE+RFC_DBELL_O_RFCPEIFG) & ui32Ifg);
+    // Clear the interrupt flags
+    RFCCpeIntClear(ui32Ifg);
 
+    // Return with the interrupt flags
     return (ui32Ifg);
 }
 

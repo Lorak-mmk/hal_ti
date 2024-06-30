@@ -110,7 +110,7 @@ elseif(CONFIG_HAS_CC26X0_SDK)
     source/ti/drivers/rf/RFCC26XX_multiMode.c
     # kernel/zephyr/dpl/config.c
     kernel/zephyr/dpl/ClockP_zephyr.c
-    # kernel/zephyr/dpl/HwiP_zephyr.c
+    kernel/zephyr/dpl/HwiP_zephyr.c
     kernel/zephyr/dpl/SwiP_zephyr.c
     kernel/zephyr/dpl/SemaphoreP_zephyr.c
     kernel/zephyr/dpl/QueueP_zephyr.c

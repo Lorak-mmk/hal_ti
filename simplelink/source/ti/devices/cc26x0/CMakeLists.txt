@@ -8,16 +8,21 @@ zephyr_library()
 
 zephyr_library_sources(
   driverlib/aon_rtc.c
+  driverlib/aon_batmon.c
+  driverlib/ddi.c
+  driverlib/vims.c
+  driverlib/adi.c
   # Required for SystemTrimDevice which is not in ROM
-  # driverlib/setup.c
-  # driverlib/chipinfo.c
+  driverlib/setup.c
+  driverlib/setup_rom.c
+  driverlib/chipinfo.c
   # driverlib/aux_sysif.c
   # Required for CPUdelay which is not in ROM
-  # driverlib/cpu.c
+  driverlib/cpu.c
   # Required functions to support the TI Power module
-  # driverlib/sys_ctrl.c
-  # driverlib/osc.c
-  # driverlib/driverlib_release.c
+  driverlib/sys_ctrl.c
+  driverlib/osc.c
+  driverlib/driverlib_release.c
   # Required for newer HAL TI >= 4.40 (for PRCMPowerDomainsAllOn)
   driverlib/prcm.c
   driverlib/trng.c
