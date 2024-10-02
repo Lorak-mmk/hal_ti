@@ -343,6 +343,19 @@ RFCHwIntClear(uint32_t ui32Mask)
   HWREG(RFC_DBELL_BASE + RFC_DBELL_O_RFHWIFG) = ~ui32Mask;
 }
 
+// TODO: Describe as backported
+//*****************************************************************************
+//
+//! Select interrupt sources to CPE0 (assign to INT_RFC_CPE_0 interrupt vector).
+//
+//*****************************************************************************
+__STATIC_INLINE void
+RFCCpe0IntSelect(uint32_t ui32Mask)
+{
+    // Multiplex RF Core interrupts to CPE0 IRQ.
+    HWREG(RFC_DBELL_BASE + RFC_DBELL_O_RFCPEISL) &= ~ui32Mask;
+}
+
 
 //*****************************************************************************
 //

@@ -364,6 +364,41 @@ SysCtrlClockLossResetDisable(void)
     HWREGBITW(AON_SYSCTL_BASE + AON_SYSCTL_O_RESETCTL, AON_SYSCTL_RESETCTL_CLK_LOSS_EN_BITN) = 0;
 }
 
+// TODO: Describe as backported
+//*****************************************************************************
+//
+// Defines for the vimsPdMode parameter of SysCtrlIdle and SysCtrlStandby
+//
+//*****************************************************************************
+#define VIMS_ON_CPU_ON_MODE     0 // VIMS power domain is only powered when CPU power domain is powered
+#define VIMS_ON_BUS_ON_MODE     1 // VIMS power domain is powered whenever the BUS power domain is powered
+#define VIMS_NO_PWR_UP_MODE     2 // VIMS power domain is not powered up at next wakeup.
+
+// TODO: Describe as backported
+//*****************************************************************************
+//
+// Force the system in to idle mode
+//
+//*****************************************************************************
+__STATIC_INLINE void SysCtrlIdle(uint32_t vimsPdMode)
+{
+    // Configure the VIMS mode
+    HWREG(PRCM_BASE + PRCM_O_PDCTL1VIMS) = vimsPdMode;
+
+    // Always keep cache retention ON in IDLE
+    PRCMCacheRetentionEnable();
+
+    // Turn off the CPU power domain, will take effect when PRCMDeepSleep() executes
+    PRCMPowerDomainOff(PRCM_DOMAIN_CPU);
+
+    // Ensure any possible outstanding AON writes complete
+    SysCtrlAonSync();
+
+    // Invoke deep sleep to go to IDLE
+    PRCMDeepSleep();
+}
+
+
 //*****************************************************************************
 //
 // Support for DriverLib in ROM:
