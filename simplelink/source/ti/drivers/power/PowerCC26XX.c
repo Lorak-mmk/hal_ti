@@ -33,6 +33,10 @@
  *  ======== PowerCC26XX.c ========
  */
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(PowerCC26XX, 5);
+
+
 #include <stdbool.h>
 
 #include <ti/drivers/dpl/ClockP.h>
@@ -1311,6 +1315,7 @@ static int_fast16_t notify(uint_fast16_t eventType)
  */
 static unsigned int configureRFCoreClocks(unsigned int action)
 {
+    LOG_DBG("called, action: %d", action);
     if (action == PowerCC26XX_ENABLE) {
         RFCClockEnable();
     }

@@ -30,6 +30,9 @@
 * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(RFCC26XX_multiMode, 0);
+
 #include <ti/drivers/dpl/ClockP.h>
 #include <ti/drivers/dpl/DebugP.h>
 #include <ti/drivers/dpl/HwiP.h>
@@ -475,6 +478,14 @@ static bool             RF_isStateTransitionAllowed(void);
 
 /* PA management */
 static RF_Stat          RF_updatePaConfiguration(RF_RadioSetup* radioSetup, RF_TxPowerTable_Value newValue);
+
+__STATIC_INLINE uint32_t
+RFCGetPowerDomainStatus(void)
+{
+    return (HWREG(PRCM_BASE + PRCM_O_PDCTL1RFC) |
+            HWREG(PRCM_BASE + PRCM_O_PDSTAT0RFC));
+}
+
 
 /*-------------- Command queue internal functions ---------------*/
 
@@ -1726,6 +1737,7 @@ static int8_t RF_schCmdRunInsertPreempt(RF_Handle h1, RF_Handle h2, RF_Cmd* pCmd
  */
 static void RF_corePowerDown(void)
 {
+    LOG_DBG("CORE POWER DOWN!!!!!");
     /* Local variables to calculate active time in current window. */
     uint32_t deltaTimeInUs = 0;
 
@@ -2099,6 +2111,8 @@ static void RF_initRadioSetup(RF_Handle handle)
  */
 static void RF_dispatchNextCmd(void)
 {
+    uint32_t power_status = HWREG(RFC_PWR_BASE);
+    LOG_DBG("Started, power: 0x%x", power_status);
     /* First element in the pend queue */
     bool doDispatchNow = false;
     RF_Cmd* pNextCmd   = (RF_Cmd*)List_head(&RF_cmdQ.pPend);
@@ -2106,6 +2120,7 @@ static void RF_dispatchNextCmd(void)
     /* Decide whether to schedule the next command or not. */
     if (pNextCmd)
     {
+        LOG_DBG("Found next command to execute. handle: %d, command id: %X", pNextCmd->ch, pNextCmd->pOp->commandNo);
         if (RF_cmdQ.pCurrCmdFg)
         {
             ; /* Do nothing. */
@@ -2132,6 +2147,7 @@ static void RF_dispatchNextCmd(void)
     }
     else
     {
+        LOG_DBG("pNextCmd null");
             /* There is nothing to do, serve the last callbacks. */
             SwiP_or(&RF_swiFsmObj, RF_FsmEventLastCommandDone);
         }
@@ -2182,6 +2198,7 @@ static void RF_dispatchNextCmd(void)
                 RF_Op* pOp = (RF_Op*)pNextCmd->pOp;
 
                 /* Send the radio operation to the RF core. */
+                LOG_DBG("PERFORMING RFCDoorbellSendTo!");
                 RFCDoorbellSendTo((uint32_t)pOp);
 
                 /* If the command is a new setup command, notify the board file. */
@@ -2379,6 +2396,11 @@ static void RF_swiHw(uintptr_t a, uintptr_t b)
  */
 static void RF_hwiCpe0Active(uintptr_t a)
 {
+    uint32_t allFlags = HWREG(RFC_DBELL_BASE+RFC_DBELL_O_RFCPEIFG);
+    int poweron = RFCGetPowerDomainStatus();
+    uint32_t cmdsta = HWREG(RFC_DBELL_BASE+RFC_DBELL_O_CMDSTA);
+    uint32_t power_status = HWREG(RFC_PWR_BASE);
+    LOG_DBG("called, flags: %x, poweron: 0x%x, CMDSTA: 0x%x, power: 0x%x", allFlags, poweron, cmdsta, power_status);
     /* Local variables. */
     RF_Cmd* volatile* ppActiveCmd  = NULL;
     RF_Cmd* volatile* activeCmd[2] = {&RF_cmdQ.pCurrCmdBg, &RF_cmdQ.pCurrCmdFg};
@@ -2405,6 +2427,13 @@ static void RF_hwiCpe0Active(uintptr_t a)
             /* Save the events happened and to be passed to the callback. */
             RF_cmdStoreEvents((*ppActiveCmd), rfcpeifg);
 
+            LOG_DBG("Found active cmd, handle %d, i: %d, rfcpeifg: %x, mask: 0x%x, cmd status: 0x%x",
+                (int)(*ppActiveCmd)->ch,
+                i,
+                rfcpeifg,
+                rfcpeifgMask,
+                (int)(*ppActiveCmd)->pOp->status);
+
             /* Look for termination events. */
             if (rfcpeifg & (RFC_DBELL_RFCPEIFG_LAST_FG_COMMAND_DONE_M | RFC_DBELL_RFCPEIFG_LAST_COMMAND_DONE_M))
             {
@@ -2414,6 +2443,7 @@ static void RF_hwiCpe0Active(uintptr_t a)
                 RFCHwIntDisable((uint32_t) ((*ppActiveCmd)->bmEvent >> RF_SHIFT_32_BITS));
 
                 /* Move active command to done queue. */
+                LOG_DBG("Adding command to pDone");
                 List_put(&RF_cmdQ.pDone, (List_Elem*)(*ppActiveCmd));
 
                 /* Retire the command, it is not running anymore. */
@@ -2434,6 +2464,7 @@ static void RF_hwiCpe0Active(uintptr_t a)
     }
 
     /* Post SWI to handle registered callbacks if there is any. */
+    LOG_DBG("Next event: 0x%x", nextEvent);
     if (nextEvent)
     {
         SwiP_or(&RF_swiFsmObj, nextEvent);
@@ -2485,6 +2516,7 @@ static void RF_clkReqAccess(uintptr_t a)
  */
 static void RF_syncCb(RF_Handle h, RF_CmdHandle ch, RF_EventMask e)
 {
+    LOG_DBG("called!");
     /* Local variables */
     RF_Cmd* pCmd;
 
@@ -2569,6 +2601,7 @@ static void RF_defaultCallback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e)
  */
 static void RF_swiFsm(uintptr_t a0, uintptr_t a1)
 {
+    LOG_DBG("start");
     RF_core.fxn(RF_currClient, (RF_FsmEvent)SwiP_getTrigger());
 }
 
@@ -2702,6 +2735,7 @@ static void RF_applyRfCorePatch(bool mode)
             rfePatchFxn();
         }
 
+        LOG_DBG("Performing RFCDoorbellSendTo");
         /* Turn off additional clocks */
         RFCDoorbellSendTo(CMDR_DIR_CMD_2BYTE(RF_CMD0, 0));
     }
@@ -2778,6 +2812,7 @@ static void RF_radioOpDoneCb(void)
 {
     /* Serve the first entry in the done queue */
     RF_Cmd* pCmd = (RF_Cmd*)List_head(&RF_cmdQ.pDone);
+    LOG_DBG("called, pCmd: %p", pCmd);
 
     /* Radio command done */
     if (pCmd)
@@ -2789,8 +2824,11 @@ static void RF_radioOpDoneCb(void)
         RF_EventMask events = pCmd->rfifg;
         pCmd->rfifg  = 0;
 
+        volatile RF_Callback cb = pCmd->pCb;
+        LOG_DBG("User callback: %p", cb);
+
         /* Issue callback, free container and dequeue */
-        if (pCmd->pCb)
+        if (cb)
         {
             /* If any of the cancel events are set, mask out the other events. */
             RF_EventMask exclusiveEvents = (RF_EventCmdCancelled
@@ -2804,8 +2842,10 @@ static void RF_radioOpDoneCb(void)
                 events &= exclusiveEvents;
             }
 
+            LOG_DBG("Calling user callback: %p", cb);
+
             /* Invoke the use callback */
-            pCmd->pCb(pCmd->pClient, pCmd->ch, events);
+            cb(pCmd->pClient, pCmd->ch, events);
         }
 
         /* Enter critical section */
@@ -2865,6 +2905,7 @@ static bool RF_isStateTransitionAllowed(void)
  */
 static void RF_fsmPowerUpState(RF_Object *pObj, RF_FsmEvent e)
 {
+    LOG_DBG("Called!, event: 0x%x", e);
     /* Note: pObj is NULL in this state */
     if (e & RF_FsmEventLastCommandDone)
     {
@@ -2917,6 +2958,7 @@ static void RF_fsmPowerUpState(RF_Object *pObj, RF_FsmEvent e)
         }
 
         /* Set the RF mode in the PRCM register (RF_open already verified that it is valid) */
+        LOG_DBG("Writing RFCMODESEL with mode %d", RF_currClient->clientConfig.pRfMode->rfMode);
         HWREG(PRCM_BASE + PRCM_O_RFCMODESEL) = RF_currClient->clientConfig.pRfMode->rfMode;
 
         /* Notiy the power driver that Standby is not allowed and RF core need to be powered */
@@ -2941,6 +2983,8 @@ static void RF_fsmPowerUpState(RF_Object *pObj, RF_FsmEvent e)
 
         /* Turn on the clock to the RF core. Registers can be accessed afterwards. */
         RFCClockEnable();
+
+        LOG_DBG("RFC_PWR after RFCClockEnable: 0x%lx", HWREG(RFC_PWR_BASE));
 
         /* Reconfigure the CPE interrupt lines to a start up value on a controlled way. */
         RFCCpeIntDisable(RF_CPE0_INT_MASK);
@@ -2968,6 +3012,7 @@ static void RF_fsmPowerUpState(RF_Object *pObj, RF_FsmEvent e)
  */
 static void RF_fsmSetupState(RF_Object *pObj, RF_FsmEvent e)
 {
+    LOG_DBG("Called!, event: 0x%x", e);
     if (e & RF_FsmEventPowerStep)
     {
         /* Apply RF Core patches (if required) */
@@ -3010,6 +3055,7 @@ static void RF_fsmSetupState(RF_Object *pObj, RF_FsmEvent e)
         RF_Cmd* pCmdFirstPend = (RF_Cmd*)List_head(&RF_cmdQ.pPend);
         if (pCmdFirstPend && ((pCmdFirstPend->pOp->commandNo == CMD_FS) || (pCmdFirstPend->pOp->commandNo == CMD_FS_OFF)))
         {
+            LOG_DBG("Found FS / FC_OFF command in chain");
             /* First command is FS command so no need to chain an implicit FS command -> Reset nRtc1 */
             RF_rtcTimestampA = 0;
         }
@@ -3058,6 +3104,26 @@ static void RF_fsmSetupState(RF_Object *pObj, RF_FsmEvent e)
             RF_core.fxn = RF_fsmXOSCState;
         }
 
+        LOG_DBG("Sending radio setup commands");
+
+        RF_Op* current_cmd = (RF_Op*)&pRadioSetup->prop;
+        while (current_cmd != NULL) {
+            LOG_DBG("Command number in chain: 0x%x", current_cmd->commandNo);
+            switch (current_cmd->commandNo) {
+                case 0x802: {
+                        struct rfc_CMD_RADIO_SETUP_s *setup_cmd = (struct rfc_CMD_RADIO_SETUP_s *)current_cmd;
+                        LOG_DBG("radio setup mode: 0x%x, frontEndMode: 0x%x, biasMode: 0x%x, analogCfgMode: 0x%x, bNoFsPowerUp: 0x%x",
+                            setup_cmd->mode,
+                            setup_cmd->config.frontEndMode,
+                            setup_cmd->config.biasMode,
+                            setup_cmd->config.analogCfgMode,
+                            setup_cmd->config.bNoFsPowerUp);
+                    } break;
+            
+            }
+            current_cmd = current_cmd->pNextOp;
+        }
+
         /* Send the setup chain to the RF core */
         RF_dbellSubmitCmdAsync((uint32_t)pRadioSetup);
 
@@ -3075,6 +3141,7 @@ static void RF_fsmSetupState(RF_Object *pObj, RF_FsmEvent e)
  */
 static void RF_fsmXOSCState(RF_Object *pObj, RF_FsmEvent e)
 {
+    LOG_DBG("Called!");
     if ((e & RF_FsmEventPowerStep) || (e & RF_FsmEventWakeup))
     {
         /* If XOSC_HF is now ready */
@@ -3103,6 +3170,7 @@ static void RF_fsmXOSCState(RF_Object *pObj, RF_FsmEvent e)
  */
 static void RF_fsmActiveState(RF_Object *pObj, RF_FsmEvent e)
 {
+    LOG_DBG("Called! event: %X", e);
     volatile RF_Cmd* pCmd;
     uint32_t rtcValTmp1;
     uint32_t rtcValTmp2;
@@ -3219,6 +3287,8 @@ static void RF_fsmActiveState(RF_Object *pObj, RF_FsmEvent e)
     {
         /* Issue radio operation done callback */
         RF_radioOpDoneCb();
+
+        LOG_DBG("RF_radioOpDoneCb done");
 
         /* Take the next command in the done queue if any left */
         if (List_empty(&RF_cmdQ.pDone))
@@ -3492,6 +3562,8 @@ static void RF_fsmActiveState(RF_Object *pObj, RF_FsmEvent e)
  */
 static void RF_init(void)
 {
+    LOG_DBG("start");
+
     union {
         HwiP_Params hp;
         SwiP_Params sp;
@@ -3687,6 +3759,7 @@ static RF_Stat RF_abortCmd(RF_Handle h, RF_CmdHandle ch, bool graceful, bool flu
                 uint32_t directCmd = (graceful) ? CMDR_DIR_CMD(CMD_STOP) : CMDR_DIR_CMD(CMD_ABORT);
 
                 /* Send the abort/stop command through the doorbell to the RF core. */
+                LOG_DBG("Performing RFCDoorbellSendTo");
                 RFCDoorbellSendTo(directCmd);
 
                 if (preempt)
@@ -3768,6 +3841,7 @@ static RF_Stat RF_executeDirectImmediateCmd(uint32_t pCmd, uint32_t* rawStatus)
     if (RF_core.status == RF_CoreStatusActive)
     {
         /* Submit the command to the doorbell */
+        LOG_DBG("Performing RFCDoorbellSendTo");
         uint32_t localStatus = RFCDoorbellSendTo(pCmd);
 
         /* Pass the rawStatus to the callee if possible. */
@@ -3879,6 +3953,7 @@ static RF_Stat RF_updatePaConfiguration(RF_RadioSetup* radioSetup, RF_TxPowerTab
  */
 RF_Handle RF_open(RF_Object *pObj, RF_Mode* pRfMode, RF_RadioSetup* pRadioSetup, RF_Params *params)
 {
+    LOG_DBG("Called RF_open");
     /* Assert */
     DebugP_assert(pObj != NULL);
 
@@ -4466,6 +4541,7 @@ RF_EventMask RF_runCmd(RF_Handle h, RF_Op* pOp, RF_Priority ePri, RF_Callback pC
  */
 RF_EventMask RF_runScheduleCmd(RF_Handle h, RF_Op* pOp, RF_ScheduleCmdParams *pSchParams, RF_Callback pCb, RF_EventMask bmEvent)
 {
+    LOG_DBG("RFC_PWR in RF_runScheduleCmd: 0x%lx", HWREG(RFC_PWR_BASE));
     /* Assert */
     DebugP_assert(h != NULL);
 
